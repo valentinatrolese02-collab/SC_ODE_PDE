@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse import spdiags, eye, kron
 import matplotlib.pyplot as plt
 from typing import Literal
+from scipy.sparse.linalg import spsolve
 
 def poisson5(m):
     e = np.ones(m)
@@ -18,10 +19,10 @@ def poisson9(m):
     A = (1/6) * (m + 1)**2 * (kron(I, S) + kron(S, I))
     return A
 
-def Laplacian(m, f, g, a, b, n: Literal[5,9]):
-    h = (b - a) / (m + 1)
-    x = np.linspace(a, b, m+2)
-    y = np.linspace(a, b, m+2)
+def Laplacian(m, f, g, n: Literal[5,9]):
+    h = 1 / (m + 1)
+    x = np.linspace(0, 1, m+2)
+    y = np.linspace(0, 1, m+2)
     X, Y = np.meshgrid(x, y)
     
     # Evaluate full matrices and extract interior points for f
@@ -41,10 +42,10 @@ def Laplacian(m, f, g, a, b, n: Literal[5,9]):
             U_bnd[0:-2, 1:-1] + U_bnd[2:, 1:-1] + 
             U_bnd[1:-1, 0:-2] + U_bnd[1:-1, 2:]
         )
-        F_copy = F - bnd_contrib * (m + 1)**2
+        F_copy = (F - bnd_contrib * (m + 1)**2).flatten() # Flatten for solver
         
         A = poisson5(m)
-        u = np.linalg.solve(A.toarray(), F_copy.flatten())
+        u = spsolve(A, F_copy)
         
     elif n == 9:
         # Deferred correction for right-hand side to achieve O(h^4) accuracy
@@ -73,7 +74,7 @@ def Laplacian(m, f, g, a, b, n: Literal[5,9]):
         F_corrected -= bnd_contrib * ((m + 1)**2) / 6.0  
         
         A = poisson9(m)
-        u = np.linalg.solve(A.toarray(), F_corrected.flatten())
+        u = spsolve(A, F_corrected.flatten())
         
     else:
         raise ValueError("n must be either 5 or 9.")
@@ -95,12 +96,12 @@ def f(x, y):
     return u_xx + u_yy
 
 # Solve system for both stencils
-u_5_flat = Laplacian(m, f, g, a, b, 5)
-u_9_flat = Laplacian(m, f, g, a, b, 9)
+u_5_flat = Laplacian(m, f, g, 5)
+u_9_flat = Laplacian(m, f, g, 9)
 
 # Rigorous numerical verification against exact interior solution
-x_int = np.linspace(a, b, m+2)[1:-1]
-y_int = np.linspace(a, b, m+2)[1:-1]
+x_int = np.linspace(0, 1, m+2)[1:-1]
+y_int = np.linspace(0, 1, m+2)[1:-1]
 X_int, Y_int = np.meshgrid(x_int, y_int)
 
 u_exact_flat = g(X_int, Y_int).flatten()
@@ -115,7 +116,7 @@ print(f"Max Error (9-point): {error_9:.2e}")
 # ####################### try convergence error ##################################
 
 # List of grid sizes to test
-m_values = [10, 20, 40, 80]
+m_values = [50, 100, 200, 400]
 
 errors_5 = []
 errors_9 = []
@@ -125,16 +126,16 @@ print(f"{'m':>4} | {'h':>8} | {'Err 5-pts':>11} | {'Ord 5':>5} | {'Err 9-pts':>1
 print("-" * 65)
 
 for i, m in enumerate(m_values):
-    h = (b - a) / (m + 1)
+    h = 1 / (m + 1)
     h_values.append(h)
     
     # Solve for both schemes
-    u_5 = Laplacian(m, f, g, a, b, 5)
-    u_9 = Laplacian(m, f, g, a, b, 9)
+    u_5 = Laplacian(m, f, g, 5)
+    u_9 = Laplacian(m, f, g, 9)
     
     # Calculate the exact solution on the interior points
-    x_int = np.linspace(a, b, m+2)[1:-1]
-    y_int = np.linspace(a, b, m+2)[1:-1]
+    x_int = np.linspace(0, 1, m+2)[1:-1]
+    y_int = np.linspace(0, 1, m+2)[1:-1]
     X_int, Y_int = np.meshgrid(x_int, y_int)
     u_exact = g(X_int, Y_int).flatten()
     
@@ -170,89 +171,3 @@ plt.title('Convergence of 5-point and 9-point Laplacian Schemes')
 plt.legend()
 plt.grid(True, which="both", ls="--")
 plt.show()
-
-
-# ########################### Proves #################
-
-# F_full = f(X, Y)
-
-# F = F_full[1:-1, 1:-1]
-
-
-
-# if n == 5:
-
-# # Incorporate boundary conditions (the contour) ONLY on the interior edges
-
-# # Bottom and Top boundaries (1, end-1)
-
-# F[0, :] -= g(X[0, 1:-1], Y[0, 1:-1]) * (m + 1)**2
-
-# F[-1, :] -= g(X[-1, 1:-1], Y[-1, 1:-1]) * (m + 1)**2
-
-
-# # Left and Right boundaries (1,end-1)
-
-# F[:, 0] -= g(X[1:-1, 0], Y[1:-1, 0]) * (m + 1)**2
-
-# F[:, -1] -= g(X[1:-1, -1], Y[1:-1, -1]) * (m + 1)**2
-
-# F = F.flatten() # Flatten the modified F5 for the solver
-
-# A = poisson5(m)
-
-# u = np.linalg.solve(A.toarray(), F)
-
-# elif n == 9:
-
-
-# # Compute unscaled 5-point Laplacian of f (h^2 cancels out mathematically)
-
-# lap_f_unscaled = (F_full[0:-2, 1:-1] + F_full[2:, 1:-1] +
-
-# F_full[1:-1, 0:-2] + F_full[1:-1, 2:] -
-
-# 4 * F)
-
-
-# # Apply correction: F_corrected = f_ij + (h^2 / 12) * \nabla_5^2 f_ij
-
-# F_corrected = F + lap_f_unscaled / 12.0
-
-
-# # 2. Apply Dirichlet Boundary Conditions (g)
-
-# # Scaling factor for the 9-point matrix is C = 1 / (6 * h^2)
-
-# C = ((m + 1)**2) / 6.0
-
-
-# # Direct neighbors (cross) have weight 4
-
-# F_corrected[0, :] -= 4 * g(X[0, 1:-1], Y[0, 1:-1]) * C # Bottom
-
-# F_corrected[-1, :] -= 4 * g(X[-1, 1:-1], Y[-1, 1:-1]) * C # Top
-
-# F_corrected[:, 0] -= 4 * g(X[1:-1, 0], Y[1:-1, 0]) * C # Left
-
-# F_corrected[:, -1] -= 4 * g(X[1:-1, -1], Y[1:-1, -1]) * C # Right
-
-
-# # Diagonal neighbors (corners) have weight 1
-
-# F_corrected[0, 0] -= 1 * g(X[0, 0], Y[0, 0]) * C # Bottom-Left
-
-# F_corrected[-1, 0] -= 1 * g(X[-1, 0], Y[-1, 0]) * C # Top-Left
-
-# F_corrected[0, -1] -= 1 * g(X[0, -1], Y[0, -1]) * C # Bottom-Right
-
-# F_corrected[-1, -1] -= 1 * g(X[-1, -1], Y[-1, -1]) * C # Top-Right
-
-
-# A = poisson9(m)
-
-# u = np.linalg.solve(A.toarray(), F_corrected.flatten())
-
-# else:
-
-# raise ValueError("n must be either 5 or 9.")
