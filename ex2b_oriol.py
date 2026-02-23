@@ -29,13 +29,11 @@ def Laplacian(m, f, g, a, b, n: Literal[5,9]):
     F = F_full[1:-1, 1:-1]
     
     # Create a full-size grid filled with boundary conditions (g).
-    # The interior remains strictly 0 to avoid altering the PDE equations.
-    g_full = g(X, Y)
     U_bnd = np.zeros_like(F_full)
-    U_bnd[0, :] = g_full[0, :]
-    U_bnd[-1, :] = g_full[-1, :]
-    U_bnd[:, 0] = g_full[:, 0]
-    U_bnd[:, -1] = g_full[:, -1]
+    U_bnd[0, :] = g(X[0, :], Y[0, :])       # Bottom boundary
+    U_bnd[-1, :] = g(X[-1,:],Y[-1,:])     # Top boundary
+    U_bnd[:, 0] = g(X[:, 0], Y[:, 0])       # Left boundary
+    U_bnd[:, -1] = g(X[:, -1], Y[:, -1])     # Right boundary
 
     if n == 5:
         # Extract boundary contributions by shifting the grid (Up, Down, Left, Right)
@@ -172,3 +170,89 @@ plt.title('Convergence of 5-point and 9-point Laplacian Schemes')
 plt.legend()
 plt.grid(True, which="both", ls="--")
 plt.show()
+
+
+# ########################### Proves #################
+
+# F_full = f(X, Y)
+
+# F = F_full[1:-1, 1:-1]
+
+
+
+# if n == 5:
+
+# # Incorporate boundary conditions (the contour) ONLY on the interior edges
+
+# # Bottom and Top boundaries (1, end-1)
+
+# F[0, :] -= g(X[0, 1:-1], Y[0, 1:-1]) * (m + 1)**2
+
+# F[-1, :] -= g(X[-1, 1:-1], Y[-1, 1:-1]) * (m + 1)**2
+
+
+# # Left and Right boundaries (1,end-1)
+
+# F[:, 0] -= g(X[1:-1, 0], Y[1:-1, 0]) * (m + 1)**2
+
+# F[:, -1] -= g(X[1:-1, -1], Y[1:-1, -1]) * (m + 1)**2
+
+# F = F.flatten() # Flatten the modified F5 for the solver
+
+# A = poisson5(m)
+
+# u = np.linalg.solve(A.toarray(), F)
+
+# elif n == 9:
+
+
+# # Compute unscaled 5-point Laplacian of f (h^2 cancels out mathematically)
+
+# lap_f_unscaled = (F_full[0:-2, 1:-1] + F_full[2:, 1:-1] +
+
+# F_full[1:-1, 0:-2] + F_full[1:-1, 2:] -
+
+# 4 * F)
+
+
+# # Apply correction: F_corrected = f_ij + (h^2 / 12) * \nabla_5^2 f_ij
+
+# F_corrected = F + lap_f_unscaled / 12.0
+
+
+# # 2. Apply Dirichlet Boundary Conditions (g)
+
+# # Scaling factor for the 9-point matrix is C = 1 / (6 * h^2)
+
+# C = ((m + 1)**2) / 6.0
+
+
+# # Direct neighbors (cross) have weight 4
+
+# F_corrected[0, :] -= 4 * g(X[0, 1:-1], Y[0, 1:-1]) * C # Bottom
+
+# F_corrected[-1, :] -= 4 * g(X[-1, 1:-1], Y[-1, 1:-1]) * C # Top
+
+# F_corrected[:, 0] -= 4 * g(X[1:-1, 0], Y[1:-1, 0]) * C # Left
+
+# F_corrected[:, -1] -= 4 * g(X[1:-1, -1], Y[1:-1, -1]) * C # Right
+
+
+# # Diagonal neighbors (corners) have weight 1
+
+# F_corrected[0, 0] -= 1 * g(X[0, 0], Y[0, 0]) * C # Bottom-Left
+
+# F_corrected[-1, 0] -= 1 * g(X[-1, 0], Y[-1, 0]) * C # Top-Left
+
+# F_corrected[0, -1] -= 1 * g(X[0, -1], Y[0, -1]) * C # Bottom-Right
+
+# F_corrected[-1, -1] -= 1 * g(X[-1, -1], Y[-1, -1]) * C # Top-Right
+
+
+# A = poisson9(m)
+
+# u = np.linalg.solve(A.toarray(), F_corrected.flatten())
+
+# else:
+
+# raise ValueError("n must be either 5 or 9.")
