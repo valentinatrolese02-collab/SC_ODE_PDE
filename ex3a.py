@@ -8,7 +8,9 @@ def Amult(U, m):
     Uses array shifting to avoid explicit matrix storage and padding.
     """
     U2d = U.reshape((m, m))
-    AU_2d = 4.0 * U2d.copy()
+    # this is true if we assume the row-wise ordering
+
+    AU_2d = 4.0 * U2d
 
     AU_2d[:-1, :] -= U2d[1:, :]  # Down neighbor
     AU_2d[1:, :]  -= U2d[:-1, :] # Up neighbor
@@ -19,7 +21,7 @@ def Amult(U, m):
     h2 = (1.0 / (m + 1))**2
     return (AU_2d / h2).flatten()
 
-def solve_poisson_cg(m,F):
+def solve_poisson_cg(m,F, rtol=1e-8):
     """
     Solves the discretized Poisson equation using Conjugate Gradient.
     Equations: -Ah * U = -F (to ensure a symmetric positive definite system).
@@ -46,7 +48,7 @@ def solve_poisson_cg(m,F):
         
     # Run the Conjugate Gradient solver
     print(f"Starting CG solver for grid {m}x{m} ({N} unknowns)...")
-    U_sol, exit_code = cg(A_op, minus_F, rtol=1e-8, callback=cg_callback)
+    U_sol, exit_code = cg(A_op, minus_F, rtol, callback=cg_callback)
     
     if exit_code == 0:
         print(f"CG converged successfully in {len(residuals)} iterations.")

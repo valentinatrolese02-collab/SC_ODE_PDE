@@ -7,7 +7,6 @@ uexact(x, y) = sin(4π(x + y)) + cos(4πxy)"""
 import numpy as np
 from scipy.sparse import spdiags, eye, kron
 from scipy.sparse.linalg import spsolve
-
 import matplotlib.pyplot as plt
 from typing import Literal
 
@@ -19,6 +18,7 @@ def poisson5(m):
     I = eye(m, format='csr')
     A = kron(I, S) + kron(S, I)
     # h = 1 / (m + 1)
+    
     A = (m + 1)**2 * A #scaling from grid spacing
     return A
 
@@ -35,41 +35,42 @@ def Laplacian_scheme(
         m: int = 10, # number of interior points
         n: Literal[5,9] = 5 # default -5 points Poisson
 ):
+    
+    h2_inv = (m + 1)**2 # 1/h^2
 
     # full grid including boundary
     x = np.linspace(0, 1, m+2)
     y = np.linspace(0, 1, m+2)
     X, Y = np.meshgrid(x, y, indexing='ij')
 
-    h2_inv = (m + 1)**2 # 1/h^2
     
     # f on interior points (vectorized)
-    F = f(X[1:-1, 1:-1], Y[1:-1, 1:-1]).reshape(m*m)
+    F = f(X[1:-1, 1:-1], Y[1:-1, 1:-1])
 
     # Correct RHS = Right Hand-Side: function we are going to correct by
     # adding g evaluated on boundary poins, accordingly to the laplancian scheme used
     RHS = F.copy()
 
-    # choose stencil
+        # Corrected indexing for 2D RHS array
     if n == 5:
         A = poisson5(m)
 
-        # bottom boundary: fixed i=0, variate y from j=1 to m
+        # x = 0 boundary (First row of interior points)
         bottom = g(x[0], y[1:-1])
-        RHS[:m] -= h2_inv*bottom
+        RHS[0, :] -= h2_inv * bottom
 
-        # top boundary: i=m+1, j=1..m
+        # x = 1 boundary (Last row of interior points)
         top = g(x[-1], y[1:-1])
-        RHS[-m:] -= h2_inv*top
+        RHS[-1, :] -= h2_inv * top
 
-        # left boundary: i=1..m, j=0
+        # y = 0 boundary (First column of interior points)
         left = g(x[1:-1], y[0])
-        RHS[::m] -= h2_inv*left
+        RHS[:, 0] -= h2_inv * left
 
-        # right boundary: i=1..m, j=m+1
+        # y = 1 boundary (Last column of interior points)
         right = g(x[1:-1], y[-1])
-        RHS[m-1::m] -= h2_inv*right
-    
+        RHS[:, -1] -= h2_inv * right
+
     else:
         A = poisson9(m)
         # bottom boundary: fixed i=0, variate y from j=1 to m
@@ -91,73 +92,83 @@ def Laplacian_scheme(
     return x, y, A, RHS.flatten() # outpus also the grid
 
 
-# Test function
-u = lambda x, y: np.sin(4 * np.pi * (x + y)) + np.cos(4 * np.pi * x * y)
-u_xx = lambda x, y: - 16* np.pi**2 * (np.sin(4 * np.pi * (x + y)) + y**2 * np.cos(4 * np.pi * x * y))
-u_yy = lambda x, y: - 16* np.pi**2 * (np.sin(4 * np.pi * (x + y)) + x**2 * np.cos(4 * np.pi * x * y))
-f = lambda x, y: u_xx(x,y) + u_yy(x,y)
+# --- TESTING & VALIDATION ZONE ---
+m = 20  
+a, b = 0, 1
 
-# N values chosen so that 4000 is perfectly divisible by N+1
-m_list = [49, 99, 199, 399]
+# Boundary condition g(x,y) based on exact solution
+def g(x, y):
+    return np.sin(4 * np.pi * (x + y)) + np.cos(4 * np.pi * x * y)
+
+# Right-hand side f(x,y) obtained from the analytical Laplacian (u_xx + u_yy)
+def f(x, y):
+    u_xx = -16 * np.pi**2 * np.sin(4 * np.pi * (x + y)) - 16 * np.pi**2 * y**2 * np.cos(4 * np.pi * x * y)
+    u_yy = -16 * np.pi**2 * np.sin(4 * np.pi * (x + y)) - 16 * np.pi**2 * x**2 * np.cos(4 * np.pi * x * y)
+    return u_xx + u_yy
+
+# Solve system for both stencils
+x, y, A, u_5_flat = Laplacian_scheme(f, g, m, 5)
+
+# Rigorous numerical verification against exact interior solution
+X, Y = np.meshgrid(x, y)
+
+u_exact_flat = g(X, Y).flatten()
+
+error_5 = np.max(np.abs(u_exact_flat - u_5_flat))
+
+print(f"Results for m={m}:")
+print(f"Max Error (5-point): {error_5:.2e}")
+
+# ####################### try convergence error ##################################
+
+# List of grid sizes to test
+m_values = [10, 20, 40, 80]
+
+errors_5 = []
+errors_9 = []
 h_values = []
-errors = []
 
-print("\nComputing test solutions...")
-for m in m_list:
-    x, y, A, b = Laplacian_scheme(f, f, m = m)
-    u_vec = spsolve(A, b) # A sparse
-    
-    U = np.zeros((m+2, m+2))
-    U[1:-1, 1:-1] = u_vec.reshape(m, m)
-    # Complete grid
-    X, Y = np.meshgrid(x, y, indexing='ij')
-    U_exact = u(X, Y)
+print(f"{'m':>4} | {'h':>8} | {'Err 5-pts':>11} | {'Ord 5':>5} | {'Err 9-pts':>11} | {'Ord 9':>5}")
+print("-" * 65)
 
-    error = np.max(np.abs(U - U_exact)) # L infty norm
-    h = 1/(m+1)
+for i, m in enumerate(m_values):
+    h = (b - a) / (m + 1)
     h_values.append(h)
-    errors.append(error)
+    
+    # Solve for both schemes
+    x, y, A, u_5 = Laplacian_scheme(f, g, m, 5)
 
-# --- 3. Estimate Convergence Order (p) ---
-# Fit a line to the log-log data: log(E) = p * log(h) + log(C)
-log_h = np.log(h_values)
-log_E = np.log(errors)
-p_slope, log_C = np.polyfit(log_h, log_E, 1)
+    
+    # Calculate the exact solution on the interior points
+    x_int = np.linspace(a, b, m+2)[1:-1]
+    y_int = np.linspace(a, b, m+2)[1:-1]
+    X_int, Y_int = np.meshgrid(x_int, y_int)
+    u_exact = g(X_int, Y_int).flatten()
+    
+    # Maximum error (Infinity norm)
+    e5 = np.max(np.abs(u_exact - u_5))
+    
+    errors_5.append(e5)
+    
+    # Calculate the empirical order of convergence relative to the previous m
+    if i == 0:
+        ord_5, ord_9 = 0.0, 0.0
+    else:
+        ord_5 = np.log(errors_5[i-1] / errors_5[i]) / np.log(h_values[i-1] / h_values[i])
+        
+    print(f"{m:4d} | {h:.6f} | {e5:.5e} | {ord_5:5.2f}")
 
-print(f"\nEstimated global order of convergence (slope): p = {p_slope:.4f}")
-
-# --- 4. Plot the Convergence Figure ---
+# --- LOG-LOG PLOT (Ideal for the report) ---
 plt.figure(figsize=(8, 6))
+plt.loglog(h_values, errors_5, 'o-', label='5-point error')
 
-# Plot actual errors
-plt.loglog(
-    h_values,
-    errors,
-    marker='o',
-    linestyle='-',
-    linewidth=2,
-    label=f'Numerical Error (slope ≈ {p_slope:.2f})'
-)
+# Reference lines for O(h^2) and O(h^4) slopes
+ref_h = np.array(h_values)
+plt.loglog(ref_h, errors_5[-1] * (ref_h / ref_h[-1])**2, 'k--', label='$\mathcal{O}(h^2)$ reference')
 
-# Reference O(h^2) line
-h_ref_line = np.array([h_values[0], h_values[-1]])
-C_ref = errors[0] / (h_values[0]**2)
-error_ref_line = C_ref * (h_ref_line**2)
-
-plt.loglog(
-    h_ref_line,
-    error_ref_line,
-    linestyle='--',
-    color='gray',
-    label='Reference $O(h^2)$'
-)
-
-# Formatting
-plt.xlabel('Grid spacing $h$ (log scale)')
-plt.ylabel('Global Error $E(h)$ (log scale)')
-plt.title('Convergence of the Global Error')
-plt.grid(True, which="both", ls="--", alpha=0.5)
+plt.xlabel('Grid spacing (h)')
+plt.ylabel('Max Error (Infinity Norm)')
+plt.title('Convergence of 5-point and 9-point Laplacian Schemes')
 plt.legend()
+plt.grid(True, which="both", ls="--")
 plt.show()
-
-
