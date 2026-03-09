@@ -42,49 +42,49 @@ def plot_smoothing_factor(m):
     plt.ylabel('Max Absolute Eigenvalue (High Frequencies)', fontsize=12)
     plt.grid(True, which='both', linestyle='--', alpha=0.5)
     plt.legend()
-    plt.ylim(0, 1.1)
+    plt.ylim(0.40, 1.00)
+    plt.xlim(0.40, 1.00)  
     #plt.show()
     print(f'for m={m} we obtain as optimal omega: {omega_opt} ')
 
 # we experiment different values
-ms = [102,97]
+ms = [30, 40, 50, 100]
 for m in ms:
     plot_smoothing_factor(m)
 
-"""import numpy as np
-import matplotlib.pyplot as plt
-
-# Confrontiamo un m pari e uno dispari vicini
-m_vals = [30, 31]
-plt.figure(figsize=(10, 6))
-
-# Usiamo un range di omega molto denso per vedere i piccoli spostamenti
-omega_range = np.linspace(0.7, 0.9, 1000) 
-
-for m in m_vals:
+def smooth(U, omega, m, F):
+    """
+    Matrix-free relaxed Jacobi iteration for the 5-point Laplacian in 2D.
+    
+    INputs:
+    U     : current iterate (of length m^2)
+    omega : relaxation parameter
+    m     : number of grid points
+    F     : right-hand side vector (of length m^2)
+    
+    Output:
+    Unew  : the updated iterate
+    """
     h = 1.0 / (m + 1)
-    p = np.arange(1, m + 1)
-    q = np.arange(1, m + 1)
-    P, Q = np.meshgrid(p, q)
+    h2 = h**2
     
-    # La soglia m/2 cambia comportamento tra pari e dispari
-    high_freq_mask = (P >= m/2) | (Q >= m/2)
+    # Reshape vectors to 2D grids (it only changes view while remaining matrix-free)
+    # U evaluated on m x m internal points => also F is m x m internal points, with implicitey adjusted boundary conditions
+    u_grid = U.reshape((m, m))
+    f_grid = F.reshape((m, m))
     
-    term_pq = 0.5 * ((np.cos(P * np.pi * h) - 1) + (np.cos(Q * np.pi * h) - 1))
-    term_high_freq = term_pq[high_freq_mask]
+    # The term (L+U)u: Sum of the 4 neighbors within the m x m grid
+    # Initializing with zeros to accumulate neighbor contributions
+    LU_u = np.zeros_like(u_grid)
     
-    max_gamma = [np.max(np.abs(1 + omega * term_high_freq)) for omega in omega_range]
+    LU_u[:-1, :] += u_grid[1:, :]  # Down neighbor
+    LU_u[1:, :]  += u_grid[:-1, :] # Up neighbor
+    LU_u[:, :-1] += u_grid[:, 1:]  # Right neighbor
+    LU_u[:, 1:]  += u_grid[:, :-1] # Left neighbor
     
-    idx_min = np.argmin(max_gamma)
-    w_opt = omega_range[idx_min]
+    # Weighted Jacobi Update: (1-w)*U + w * D^-1 * (F - (L+U)U)
+    # Since Au = (D - (L+U))u = F => Du = F + (L+U)u
+    # Here D = 4/h2, so D^-1 = h2/4
+    unew_grid = (1 - omega) * u_grid + (omega / 4.0) * (h2 * f_grid + LU_u)
     
-    plt.plot(omega_range, max_gamma, label=fr'm={m} (min at $\omega \approx {w_opt:.4f}$)')
-    plt.scatter(w_opt, max_gamma[idx_min], zorder=5)
-
-plt.axvline(0.8, color='black', linestyle='--', alpha=0.3, label='Theoretical 0.8')
-plt.title('Comparison of Even vs Odd $m$ (High-Frequency Smoothing)', fontsize=14)
-plt.xlabel(r'Relaxation parameter $\omega$', fontsize=12)
-plt.ylabel(r'Max $|\gamma_{p,q}|$', fontsize=12)
-plt.grid(True, linestyle=':', alpha=0.6)
-plt.legend()
-plt.show()"""
+    return unew_grid.flatten()
