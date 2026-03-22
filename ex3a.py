@@ -19,7 +19,7 @@ def Amult(U, m):
     
     # Scale by h^2 where h = 1 / (m + 1)
     h2 = (1.0 / (m + 1))**2
-    return (AU_2d / h2).flatten()
+    return -(AU_2d / h2).flatten()
 
 def solve_poisson_cg(m,F, rtol=1e-8):
     """
@@ -48,7 +48,7 @@ def solve_poisson_cg(m,F, rtol=1e-8):
         
     # Run the Conjugate Gradient solver
     print(f"Starting CG solver for grid {m}x{m} ({N} unknowns)...")
-    U_sol, exit_code = cg(A_op, minus_F, rtol, callback=cg_callback)
+    U_sol, exit_code = cg(A_op, minus_F, rtol=rtol, callback=cg_callback)
     
     if exit_code == 0:
         print(f"CG converged successfully in {len(residuals)} iterations.")

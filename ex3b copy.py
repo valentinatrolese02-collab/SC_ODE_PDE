@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from ex3a import Amult
 
 # it plots the max eigenvalue in abs value for p,q in [m/2, m]
 def plot_smoothing_factor(m):
@@ -46,6 +47,104 @@ def plot_smoothing_factor(m):
     plt.show()
     print(f'for m={m} we obtain as optimal omega: {omega_opt} ')
 
+
+
+
+import numpy as np
+
+def smooth(U, F, m, omega):
+    """
+    Performs under-relaxed Jacobi smoothing for the 2D Poisson equation.
+    
+    Args:
+        U (np.ndarray): Current approximation of the solution (1D array of size m*m).
+        F (np.ndarray): Right-hand side vector (1D array of size m*m).
+        m (int): Number of interior grid points in one dimension.
+        omega (float, optional): Relaxation parameter. Defaults to 0.8 (optimal for 2D).
+        num_iters (int, optional): Number of smoothing sweeps. Defaults to 2.
+        
+    Returns:
+        np.ndarray: The smoothed approximation vector.
+    """
+    # Calculate grid spacing
+    h = 1.0 / (m + 1)
+    
+    # Inverse of the diagonal matrix D for the 5-point Laplacian.
+    D_inv = (h**2) / 4.0  
+    
+    # Copy U to prevent modifying the original array in-place
+    U_k = np.copy(U)
+    
+    # 1. Compute matrix-vector product A * U_k using the matrix-free function
+    AU = Amult(U_k, m)
+    
+    # 2. Compute the residual R = F - A * U_k
+    R = F + AU
+    
+    # 3. Update the approximation using the relaxed Jacobi formula
+    U_k = U_k + omega * D_inv * R
+        
+    return U_k
+
+# --- TEST SETUP ---
+# According to the assignment: m = 2^k - 1
+k = 5
+m = 2**k - 1  # 31x31 grid
+h = 1.0 / (m + 1)
+
+# Create the 2D grid for interior points
+x = np.linspace(h, 1-h, m)
+y = np.linspace(h, 1-h, m)
+X, Y = np.meshgrid(x, y)
+
+# 1. Initial condition: Low-frequency wave + high-frequency noise
+low_freq = np.sin(np.pi * X) * np.sin(np.pi * Y)
+high_freq = 0.5 * np.sin(15 * np.pi * X) * np.sin(15 * np.pi * Y)
+U_initial_2d = low_freq + high_freq
+
+# Flatten to a 1D vector for the function input
+U_initial = U_initial_2d.flatten()
+
+# 2. Right-hand side (F) set to 0 to solve the pure Laplace problem
+F = np.zeros_like(U_initial)
+
+# 3. Apply the smoother
+iterations = 5
+U_smoothed = smooth(U_initial, F, m, omega=0.8, num_iters=iterations)
+
+# Reshape back to 2D for plotting
+U_smoothed_2d = U_smoothed.reshape((m, m))
+
+# --- PLOT GENERATION ---
+fig = plt.figure(figsize=(12, 5))
+
+# Plot 1: Initial Guess
+ax1 = fig.add_subplot(121, projection='3d')
+surf1 = ax1.plot_surface(X, Y, U_initial_2d, cmap='viridis', edgecolor='none')
+ax1.set_title("Initial Approximation\n(Smooth wave + High-frequency noise)")
+ax1.set_xlabel('x')
+ax1.set_ylabel('y')
+ax1.set_zlabel('U')
+
+# Plot 2: Smoothed Solution
+ax2 = fig.add_subplot(122, projection='3d')
+surf2 = ax2.plot_surface(X, Y, U_smoothed_2d, cmap='viridis', edgecolor='none')
+ax2.set_title(f"After {iterations} 'smooth' iterations\n(High-frequency removed)")
+ax2.set_xlabel('x')
+ax2.set_ylabel('y')
+ax2.set_zlabel('U')
+ax2.set_zlim(ax1.get_zlim()) # Keep the same Z-scale for a fair comparison
+
+plt.tight_layout()
+# plt.show()
+
+def coarsen(R,m):
+    # function body
+    return Rc
+
+def interpolate(Rc,m):
+    # function body
+    return R
 
 """import numpy as np
 import matplotlib.pyplot as plt
