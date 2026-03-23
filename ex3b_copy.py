@@ -66,22 +66,12 @@ def smooth(U, F, m, omega):
     Returns:
         np.ndarray: The smoothed approximation vector.
     """
-    # Calculate grid spacing
     h = 1.0 / (m + 1)
-    
-    # Inverse of the diagonal matrix D for the 5-point Laplacian.
+
     D_inv = (h**2) / 4.0  
-    
-    # Copy U to prevent modifying the original array in-place
     U_k = np.copy(U)
-    
-    # 1. Compute matrix-vector product A * U_k using the matrix-free function
     AU = Amult(U_k, m)
-    
-    # 2. Compute the residual R = F - A * U_k
     R = F + AU
-    
-    # 3. Update the approximation using the relaxed Jacobi formula
     U_k = U_k + omega * D_inv * R
         
     return U_k
@@ -138,13 +128,6 @@ ax2.set_zlim(ax1.get_zlim()) # Keep the same Z-scale for a fair comparison
 plt.tight_layout()
 # plt.show()
 
-def coarsen(R,m):
-    # function body
-    return Rc
-
-def interpolate(Rc,m):
-    # function body
-    return R
 
 """import numpy as np
 import matplotlib.pyplot as plt

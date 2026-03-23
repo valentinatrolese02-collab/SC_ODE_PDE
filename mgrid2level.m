@@ -29,14 +29,14 @@ for i=1:10,
   E2 = U2-Uhat;
   subplot(1,2,1),
   plot(X,Uhat,'b-', ...
-       X,U2,   'gx');
+       X,U2,   'rx');
   set(gca,'fontsize',16);
   xlabel('x');
   ylabel('U');
   title(sprintf('Iter=%4d', i));
   subplot(1,2,2),
   plot(X,Ehat,'b-',...
-       X,E2,'gx');
+       X,E2,'rx');
   set(gca,'fontsize',16);
   xlabel('x');
   ylabel('E');
@@ -78,14 +78,14 @@ U2=U2-e;
 E2=U2-Uhat;
 subplot(1,2,1),
 plot(X,Uhat,'b-', ...
-     X,U2,   'gx');
+     X,U2,   'rx');
 set(gca,'fontsize',16);
 xlabel('x');
 ylabel('U');
 title('After coarse grid projection');
 subplot(1,2,2),
 plot(X,Ehat,'b-',...
-     X,E2,'gx');
+     X,E2,'rx');
 set(gca,'fontsize',16);
 xlabel('x');
 ylabel('E');
@@ -98,14 +98,14 @@ for i=1:10,
   E2 = U2-Uhat;
   subplot(1,2,1),
   plot(X,Uhat,'b-', ...
-       X,U2,   'gx');
+       X,U2,   'rx');
   set(gca,'fontsize',16);
   xlabel('x');
   ylabel('U');
   title(sprintf('Iter=%4d', i));
   subplot(1,2,2),
   plot(X,Ehat,'b-',...
-       X,E2,'gx');
+       X,E2,'rx');
   set(gca,'fontsize',16);
   xlabel('x');
   ylabel('E');
