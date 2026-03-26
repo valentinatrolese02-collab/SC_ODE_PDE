@@ -1,3 +1,8 @@
+"""
+We solve point (c) and (d) together, by creating a function which takes as input the number of 
+points for the laplacian scheme and converce test on both schemes on a unique loop
+"""
+
 import numpy as np
 from scipy.sparse import spdiags, eye, kron
 import matplotlib.pyplot as plt
@@ -19,8 +24,13 @@ def poisson9(m):
     A = (1/6) * (m + 1)**2 * (kron(I, S) + kron(S, I))
     return A
 
-def Laplacian(m, f, g, n: Literal[5,9]):
-    h = 1 / (m + 1)
+def Laplacian(
+        f, # function to solve
+        g, # function for Dirichlet boundary conditions
+        m: int = 10, # number of interior points
+        n: Literal[5,9] = 5 # default -5 points Poisson
+):
+    
     x = np.linspace(0, 1, m+2)
     y = np.linspace(0, 1, m+2)
     X, Y = np.meshgrid(x, y)
@@ -29,61 +39,60 @@ def Laplacian(m, f, g, n: Literal[5,9]):
     F_full = f(X, Y)
     F = F_full[1:-1, 1:-1]
     
-    # Create a full-size grid filled with boundary conditions (g).
+    # Create a full-size grid filled with boundary conditions from g
     U_bnd = np.zeros_like(F_full)
-    U_bnd[0, :] = g(X[0, :], Y[0, :])       # Bottom boundary
-    U_bnd[-1, :] = g(X[-1,:],Y[-1,:])     # Top boundary
-    U_bnd[:, 0] = g(X[:, 0], Y[:, 0])       # Left boundary
-    U_bnd[:, -1] = g(X[:, -1], Y[:, -1])     # Right boundary
+    U_bnd[0, :] = g(X[0, :], Y[0, :])       # Bottom = fixed index i = 0
+    U_bnd[-1, :] = g(X[-1,:],Y[-1,:])     # Top
+    U_bnd[:, 0] = g(X[:, 0], Y[:, 0])       # Left
+    U_bnd[:, -1] = g(X[:, -1], Y[:, -1])     # Right
 
     if n == 5:
-        # Extract boundary contributions by shifting the grid (Up, Down, Left, Right)
-        bnd_contrib = (
-            U_bnd[0:-2, 1:-1] + U_bnd[2:, 1:-1] + 
-            U_bnd[1:-1, 0:-2] + U_bnd[1:-1, 2:]
-        )
-        F_copy = (F - bnd_contrib * (m + 1)**2).flatten() # Flatten for solver
+        # Extract boundary contributions by shifting the grid (top, bottom, Left, Right)
+        # bnd_contrib has shape mxm
+        bnd_contrib = U_bnd[0:-2, 1:-1] + U_bnd[2:, 1:-1] + U_bnd[1:-1, 0:-2] + U_bnd[1:-1, 2:]
+        
+        # correct right hand side
+        F_corrected = (F - bnd_contrib * (m + 1)**2).flatten() # Flatten for solver
         
         A = poisson5(m)
-        u = spsolve(A, F_copy)
+        u = spsolve(A, F_corrected)
         
     elif n == 9:
-        # Deferred correction for right-hand side to achieve O(h^4) accuracy
+        # Deferred correction for right-hand side 
         lap_f_unscaled = (F_full[0:-2, 1:-1] + F_full[2:, 1:-1] + 
                           F_full[1:-1, 0:-2] + F_full[1:-1, 2:] - 
                           4 * F)
         F_corrected = F + lap_f_unscaled / 12.0
         
         # Boundary contributions mapped directly via stencil weights:
-        # Straight neighbors (weight 4) + Diagonal neighbors (weight 1)
         bnd_contrib = (
-            # 1. DIRECT NEIGHBORS (Weight = 4)
-            4 * U_bnd[0:-2, 1:-1] +  # Neighbor BELOW (Y-1, X)
-            4 * U_bnd[2:, 1:-1]   +  # Neighbor ABOVE (Y+1, X)
-            4 * U_bnd[1:-1, 0:-2] +  # Neighbor LEFT  (Y, X-1)
-            4 * U_bnd[1:-1, 2:]   +  # Neighbor RIGHT (Y, X+1)
-            
-            # 2. DIAGONAL NEIGHBORS (Weight = 1)
-            1 * U_bnd[0:-2, 0:-2] +  # Corner BOTTOM-LEFT  (Y-1, X-1)
-            1 * U_bnd[2:, 0:-2]   +  # Corner TOP-LEFT     (Y+1, X-1)
-            1 * U_bnd[0:-2, 2:]   +  # Corner BOTTOM-RIGHT (Y-1, X+1)
-            1 * U_bnd[2:, 2:]        # Corner TOP-RIGHT    (Y+1, X+1)
+            # DIRECT NEIGHBORS (Weight = 4)
+            4 * U_bnd[0:-2, 1:-1] +  # BELOW
+            4 * U_bnd[2:, 1:-1]   +  # ABOVE 
+            4 * U_bnd[1:-1, 0:-2] +  # LEFT  
+            4 * U_bnd[1:-1, 2:]   +  # RIGHT 
+
+            # DIAGONAL NEIGHBORS (Weight = 1)
+            1 * U_bnd[0:-2, 0:-2] +  #  BOTTOM-LEFT
+            1 * U_bnd[2:, 0:-2]   +  #  TOP-LEFT    
+            1 * U_bnd[0:-2, 2:]   +  #  BOTTOM-RIGHT
+            1 * U_bnd[2:, 2:]        # TOP-RIGHT   
         )
-        
-        # Scale boundary contribution by 1 / (6*h^2) and subtract from RHS
-        F_corrected -= bnd_contrib * ((m + 1)**2) / 6.0  
+
+        # correct right hand side 
+        F_corrected -= bnd_contrib * (m + 1)**2 / 6.0  
+        F_corrected = F_corrected.flatten()
         
         A = poisson9(m)
-        u = spsolve(A, F_corrected.flatten())
+        u = spsolve(A, F_corrected)
         
     else:
         raise ValueError("n must be either 5 or 9.")
 
     return u
 
-# --- TESTING & VALIDATION ZONE ---
+# TESTING
 m = 20  
-a, b = 0, 1
 
 # Boundary condition g(x,y) based on exact solution
 def g(x, y):
@@ -96,10 +105,10 @@ def f(x, y):
     return u_xx + u_yy
 
 # Solve system for both stencils
-u_5_flat = Laplacian(m, f, g, 5)
-u_9_flat = Laplacian(m, f, g, 9)
+u_5_flat = Laplacian(f, g, m, 5)
+u_9_flat = Laplacian(f, g, m, 9)
 
-# Rigorous numerical verification against exact interior solution
+# numerical verification against exact interior solution
 x_int = np.linspace(0, 1, m+2)[1:-1]
 y_int = np.linspace(0, 1, m+2)[1:-1]
 X_int, Y_int = np.meshgrid(x_int, y_int)
@@ -113,7 +122,7 @@ print(f"Results for m={m}:")
 print(f"Max Error (5-point): {error_5:.2e}")
 print(f"Max Error (9-point): {error_9:.2e}")
 
-# ####################### try convergence error ##################################
+# COVERGENCE ERROR
 
 # List of grid sizes to test
 m_values = [50, 100, 200, 400]
@@ -130,8 +139,8 @@ for i, m in enumerate(m_values):
     h_values.append(h)
     
     # Solve for both schemes
-    u_5 = Laplacian(m, f, g, 5)
-    u_9 = Laplacian(m, f, g, 9)
+    u_5 = Laplacian(f, g, m, 5)
+    u_9 = Laplacian(f, g, m, 9)
     
     # Calculate the exact solution on the interior points
     x_int = np.linspace(0, 1, m+2)[1:-1]
@@ -155,15 +164,17 @@ for i, m in enumerate(m_values):
         
     print(f"{m:4d} | {h:.6f} | {e5:.5e} | {ord_5:5.2f} | {e9:.5e} | {ord_9:5.2f}")
 
-# --- LOG-LOG PLOT (Ideal for the report) ---
+#  LOG-LOG PLOT
 plt.figure(figsize=(8, 6))
 plt.loglog(h_values, errors_5, 'o-', label='5-point error')
 plt.loglog(h_values, errors_9, 's-', label='9-point error')
 
-# Reference lines for O(h^2) and O(h^4) slopes
+# Reference lines shifted to overlay our data for better visualization
 ref_h = np.array(h_values)
-plt.loglog(ref_h, errors_5[-1] * (ref_h / ref_h[-1])**2, 'k--', label='$\mathcal{O}(h^2)$ reference')
-plt.loglog(ref_h, errors_9[-1] * (ref_h / ref_h[-1])**4, 'r--', label='$\mathcal{O}(h^4)$ reference')
+# h^2
+plt.loglog(ref_h, errors_5[-1] * (ref_h / ref_h[-1])**2, 'k--', label=r'$\mathcal{O}(h^2)$ reference')
+# h^4
+plt.loglog(ref_h, errors_9[-1] * (ref_h / ref_h[-1])**4, 'r--', label=r'$\mathcal{O}(h^4)$ reference')
 
 plt.xlabel('Grid spacing (h)')
 plt.ylabel('Max Error (Infinity Norm)')

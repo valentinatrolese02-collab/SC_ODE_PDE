@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# it plots the max eigenvalue in abs value for p,q in [m/2, m]
+# it plots the max eigenvalue in abs value for p,q in [m/2, m]x[m/2, m]
 def plot_smoothing_factor(m):
     h = 1.0 / (m + 1)
     # we choose many samples for omega
@@ -31,7 +31,7 @@ def plot_smoothing_factor(m):
     plt.figure(figsize=(10, 6))
     plt.plot(omega_range, max_gamma, label=r'$\max_{m/2 \leq p,q \leq m} |\gamma_{p,q}|$', color='blue', lw=2)
     
-    # value of ω which ”visually minimizes” the max eigenvalue
+    # value of omega which visually minimizes the max eigenvalue
     omega_opt = omega_range[np.argmin(max_gamma)]
     plt.axvline(omega_opt, color='red', linestyle='--', alpha=0.7, 
                 label=fr'Optimal $\omega \approx {omega_opt:.3f}$')
@@ -44,7 +44,7 @@ def plot_smoothing_factor(m):
     plt.legend()
     plt.ylim(0.40, 1.00)
     plt.xlim(0.40, 1.00)  
-    #plt.show()
+    plt.show()
     print(f'for m={m} we obtain as optimal omega: {omega_opt} ')
 
 # we experiment different values
@@ -52,19 +52,16 @@ ms = [30, 40, 50, 100]
 for m in ms:
     plot_smoothing_factor(m)
 
-def smooth(U, omega, m, F):
-    """
-    Matrix-free relaxed Jacobi iteration for the 5-point Laplacian in 2D.
-    
-    INputs:
-    U     : current iterate (of length m^2)
-    omega : relaxation parameter
-    m     : number of grid points
-    F     : right-hand side vector (of length m^2)
-    
-    Output:
-    Unew  : the updated iterate
-    """
+# Implement a matrix-free relaxed Jacobi iteration for the 5-point Laplacian discretization in 2D
+# and the optimal value of ω that you have found as a Python function
+# It ouptuts the updated iterate Unew
+def smooth(
+        U,      #current iterate (of length m^2)
+        omega,  #relaxation parameter
+        m,      #number of grid points
+        F       #right-hand side vector (of length m^2)
+):
+
     h = 1.0 / (m + 1)
     h2 = h**2
     
@@ -77,10 +74,10 @@ def smooth(U, omega, m, F):
     # Initializing with zeros to accumulate neighbor contributions
     LU_u = np.zeros_like(u_grid)
     
-    LU_u[:-1, :] += u_grid[1:, :]  # Down neighbor
-    LU_u[1:, :]  += u_grid[:-1, :] # Up neighbor
-    LU_u[:, :-1] += u_grid[:, 1:]  # Right neighbor
-    LU_u[:, 1:]  += u_grid[:, :-1] # Left neighbor
+    LU_u[:-1, :] += u_grid[1:, :]  # Down 
+    LU_u[1:, :]  += u_grid[:-1, :] # Up 
+    LU_u[:, :-1] += u_grid[:, 1:]  # Right 
+    LU_u[:, 1:]  += u_grid[:, :-1] # Left 
     
     # Weighted Jacobi Update: (1-w)*U + w * D^-1 * (F - (L+U)U)
     # Since Au = (D - (L+U))u = F => Du = F + (L+U)u
