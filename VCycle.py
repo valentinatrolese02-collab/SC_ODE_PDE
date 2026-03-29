@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 from mpl_toolkits.mplot3d import Axes3D
-plt.close('all')
 
 def coarsen(R, m):
     # Calculate expected coarse grid dimension
@@ -195,7 +194,7 @@ if __name__ == '__main__':
     # Keep parameters constant for a fair comparison
     omega = 0.8
     nsmooth = 3
-    epsilon = 1.0e-6
+    epsilon = 1.0e-10
     max_iters = 100
     
     # List to store the number of iterations for each grid size
