@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 
 from scipy.integrate import solve_ivp
 
+# Choice of methods are in general based on concerns about
+# •Accuracy and eﬃciency requirements
+# •Robustness (Stability)
+# •Memory requirements
+
 
 # general RungeKutta solver - no order is defined
 def RKsolver(f, t0, y0, h, c, A, b, d, reps, aeps):
@@ -51,6 +56,8 @@ def RKsolver(f, t0, y0, h, c, A, b, d, reps, aeps):
             # Update h and restart the 'while' loop for this same t0
             h = h_new
 
+
+# method of order 2 and 3. It implements a (simple) step-size control that attempts to satisfy E < tol
 # adaptive 2-3 RKsolver; it handles 1dim or multidim input y
 def RK_23(f, t0, y0, h, tf, reps, aeps):
     # Define tableau for Runge Kutta 2-3
@@ -58,7 +65,6 @@ def RK_23(f, t0, y0, h, tf, reps, aeps):
     A = np.array([[0, 0, 0], [1/2, 0, 0], [-1, 2, 0]])
     b = np.array([1/6, 2/3, 1/6])
     d = np.array([1/12, -1/6, 1 /12])
-
 
     # Storage for plotting later
     t_list = [t0]
